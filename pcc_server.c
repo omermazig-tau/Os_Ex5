@@ -106,50 +106,53 @@ int connect_server(unsigned int port_number) {
     return sockfd;
 }
 
-void write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) {
+size_t write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) {
     // This is based on this SO answer - https://stackoverflow.com/a/9142150/2899096
     size_t left = chars_to_write;
     ssize_t temp_bytes_written;
     do {
         temp_bytes_written = write(sockfd, characters, left);
-        if (temp_bytes_written < 0) {
+        if (temp_bytes_written <= 0) {
             perror("Error writing to socket");
-            exit(1);
+            return left;
         }
         characters += temp_bytes_written;
         left -= temp_bytes_written;
     } while (left > 0);
+    return left;
 }
 
-void read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) {
+size_t read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) {
     // IMPORTANT - ASSUMES THAT `*characters` IS ALREADY ALLOCATED!!
     // This is based on this SO answer - https://stackoverflow.com/a/9142150/2899096
     size_t left = chars_to_read;
     ssize_t temp_bytes_read;
     do {
         temp_bytes_read = read(sockfd, characters, left);
-        if (temp_bytes_read < 0) {
+        if (temp_bytes_read <= 0) {
             perror("Error reading from socket");
-            exit(1);
+            return left;
         }
         characters += temp_bytes_read;
         left -= temp_bytes_read;
     } while (left > 0);
+    return left;
 }
 
-void write_number_to_socket(uint32_t number, int sockfd) {
+uint32_t write_number_to_socket(uint32_t number, int sockfd) {
     uint32_t file_size_for_transfer = htonl(number);
 
     char *file_size_buffer_for_transfer = (char *) &file_size_for_transfer;
-    write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
+    size_t bytes_left = write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
+    return bytes_left;
 }
 
-uint32_t read_number_from_socket(int sockfd) {
+uint32_t read_number_from_socket(uint32_t *number, int sockfd) {
     uint32_t number_for_transfer;
     char *file_size_buffer_for_transfer = (char *) &number_for_transfer;
-    read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
-    uint32_t file_size = ntohl(number_for_transfer);
-    return file_size;
+    size_t bytes_left = read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
+    *number = ntohl(number_for_transfer);
+    return bytes_left;
 }
 
 int main(int argc, char *argv[]) {
@@ -170,8 +173,10 @@ int main(int argc, char *argv[]) {
     char buffer[batch_size];
     while (!is_sig_int) {
         int client_fd = accept_connection(sockfd);
+        uint32_t left;
         // Read the file size from the client
-        uint32_t file_size = read_number_from_socket(client_fd);
+        uint32_t file_size;
+        left = read_number_from_socket(&file_size, client_fd);
 
         unsigned int pcc = 0;
         uint32_t temp_pcc_total[126 + 1] = {0};
@@ -179,18 +184,18 @@ int main(int argc, char *argv[]) {
         // Read data from the client and count printable characters
         do {
             size_t bytes_to_read = batch_size < file_size - bytes_read ? batch_size : file_size - bytes_read;
-            read_chars_from_socket(buffer, bytes_to_read, client_fd);
+            left = read_chars_from_socket(buffer, bytes_to_read, client_fd);
             bytes_read += bytes_to_read;
 
             for (int i = 0; i < bytes_to_read; ++i) {
                 if (is_printable_character(buffer[i])) {
                     pcc++;
-                    temp_pcc_total[buffer[i]]++;
+                    temp_pcc_total[(int)(buffer[i])]++;
                 }
             }
         } while (bytes_read < file_size);
         // Write the result back to the client
-        write_number_to_socket(pcc, client_fd);
+        left = write_number_to_socket(pcc, client_fd);
         // Update pcc_total
         update_pcc_total(temp_pcc_total);
         close(client_fd);

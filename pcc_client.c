@@ -39,50 +39,53 @@ int connect_to_server(unsigned int port_number, char *ip) {
     return sockfd;
 }
 
-void write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) {
+size_t write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) {
     // This is based on this SO answer - https://stackoverflow.com/a/9142150/2899096
     size_t left = chars_to_write;
     ssize_t temp_bytes_written;
     do {
         temp_bytes_written = write(sockfd, characters, left);
-        if (temp_bytes_written < 0) {
+        if (temp_bytes_written <= 0) {
             perror("Error writing to socket");
-            exit(1);
+            return left;
         }
         characters += temp_bytes_written;
         left -= temp_bytes_written;
     } while (left > 0);
+    return left;
 }
 
-void read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) {
+size_t read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) {
     // IMPORTANT - ASSUMES THAT `*characters` IS ALREADY ALLOCATED!!
     // This is based on this SO answer - https://stackoverflow.com/a/9142150/2899096
     size_t left = chars_to_read;
     ssize_t temp_bytes_read;
     do {
         temp_bytes_read = read(sockfd, characters, left);
-        if (temp_bytes_read < 0) {
+        if (temp_bytes_read <= 0) {
             perror("Error reading from socket");
-            exit(1);
+            return left;
         }
         characters += temp_bytes_read;
         left -= temp_bytes_read;
     } while (left > 0);
+    return left;
 }
 
-void write_number_to_socket(uint32_t number, int sockfd) {
+uint32_t write_number_to_socket(uint32_t number, int sockfd) {
     uint32_t file_size_for_transfer = htonl(number);
 
     char *file_size_buffer_for_transfer = (char *) &file_size_for_transfer;
-    write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
+    size_t bytes_left = write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
+    return bytes_left;
 }
 
-uint32_t read_number_from_socket(int sockfd) {
+uint32_t read_number_from_socket(uint32_t *number, int sockfd) {
     uint32_t number_for_transfer;
     char *file_size_buffer_for_transfer = (char *) &number_for_transfer;
-    read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
-    uint32_t file_size = ntohl(number_for_transfer);
-    return file_size;
+    size_t bytes_left = read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
+    *number = ntohl(number_for_transfer);
+    return bytes_left;
 }
 
 uint32_t get_file_size(char *file_path) {
@@ -129,7 +132,8 @@ int main(int argc, char *argv[]) {
         write_chars_to_socket(buffer, bytes_read, sockfd);
     }
 
-    uint32_t C = read_number_from_socket(sockfd);
+    uint32_t C;
+    read_number_from_socket(&C, sockfd);
     // print the number of printable characters
     printf("# of printable characters: %u\n", C);
 
