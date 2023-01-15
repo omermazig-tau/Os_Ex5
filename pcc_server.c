@@ -11,6 +11,7 @@ const int MB_IN_BYTES = 1048576;
 const int RESERVED_TCP_PORTS = 1024;
 uint32_t pcc_total[126 + 1] = {0};
 bool is_sig_int = false;
+bool accepted_connection = false;
 
 bool is_printable_character(char character) {
     return 32 <= character && character <= 126;
@@ -30,7 +31,10 @@ void print_pcc_total() {
 }
 
 void sig_int_handler() {
-    //TODO - Add logic here
+    if (!accepted_connection) {
+        print_pcc_total();
+        exit(0);
+    }
     is_sig_int = true;
 }
 
@@ -173,10 +177,14 @@ int main(int argc, char *argv[]) {
     char buffer[batch_size];
     while (!is_sig_int) {
         int client_fd = accept_connection(sockfd);
+        accepted_connection = true;
         uint32_t left;
         // Read the file size from the client
         uint32_t file_size;
         left = read_number_from_socket(&file_size, client_fd);
+        if(left != 0){
+            continue;
+        }
 
         unsigned int pcc = 0;
         uint32_t temp_pcc_total[126 + 1] = {0};
@@ -185,6 +193,9 @@ int main(int argc, char *argv[]) {
         do {
             size_t bytes_to_read = batch_size < file_size - bytes_read ? batch_size : file_size - bytes_read;
             left = read_chars_from_socket(buffer, bytes_to_read, client_fd);
+            if(left != 0){
+                break;
+            }
             bytes_read += bytes_to_read;
 
             for (int i = 0; i < bytes_to_read; ++i) {
@@ -194,11 +205,21 @@ int main(int argc, char *argv[]) {
                 }
             }
         } while (bytes_read < file_size);
+        if(left != 0){
+            // This means that we ended the reading from the client on bad terms
+            continue;
+        }
+
         // Write the result back to the client
         left = write_number_to_socket(pcc, client_fd);
+        if(left != 0){
+            continue;
+        }
         // Update pcc_total
         update_pcc_total(temp_pcc_total);
         close(client_fd);
+        accepted_connection = false;
     }
     print_pcc_total();
+    exit(0);
 }
