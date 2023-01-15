@@ -29,6 +29,7 @@ void print_pcc_total() {
 }
 
 void sig_int_handler() {
+    //TODO - Add logic here
     exit(420);
 }
 
@@ -145,7 +146,7 @@ void write_number_to_socket(uint32_t number, int sockfd){
 uint32_t read_number_from_socket(int sockfd){
     uint32_t number_for_transfer;
     char *file_size_buffer_for_transfer = (char *) &number_for_transfer;
-    read_chars_from_socket(file_size_buffer_for_transfer, 4, sockfd);
+    read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
     uint32_t file_size = ntohl(number_for_transfer);
     return file_size;
 }
