@@ -136,14 +136,14 @@ void read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) 
     } while (left > 0);
 }
 
-void write_number_to_socket(uint32_t number, int sockfd){
+void write_number_to_socket(uint32_t number, int sockfd) {
     uint32_t file_size_for_transfer = htonl(number);
 
     char *file_size_buffer_for_transfer = (char *) &file_size_for_transfer;
     write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
 }
 
-uint32_t read_number_from_socket(int sockfd){
+uint32_t read_number_from_socket(int sockfd) {
     uint32_t number_for_transfer;
     char *file_size_buffer_for_transfer = (char *) &number_for_transfer;
     read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);

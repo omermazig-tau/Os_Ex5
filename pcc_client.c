@@ -45,7 +45,7 @@ void write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) 
     ssize_t temp_bytes_written;
     do {
         temp_bytes_written = write(sockfd, characters, left);
-        if(temp_bytes_written < 0) {
+        if (temp_bytes_written < 0) {
             perror("Error writing to socket");
             exit(1);
         }
@@ -55,12 +55,13 @@ void write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd) 
 }
 
 void read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) {
+    // IMPORTANT - ASSUMES THAT `*characters` IS ALREADY ALLOCATED!!
     // This is based on this SO answer - https://stackoverflow.com/a/9142150/2899096
     size_t left = chars_to_read;
     ssize_t temp_bytes_read;
     do {
         temp_bytes_read = read(sockfd, characters, left);
-        if(temp_bytes_read < 0) {
+        if (temp_bytes_read < 0) {
             perror("Error reading from socket");
             exit(1);
         }
@@ -69,14 +70,14 @@ void read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd) 
     } while (left > 0);
 }
 
-void write_number_to_socket(uint32_t number, int sockfd){
+void write_number_to_socket(uint32_t number, int sockfd) {
     uint32_t file_size_for_transfer = htonl(number);
 
     char *file_size_buffer_for_transfer = (char *) &file_size_for_transfer;
     write_chars_to_socket(file_size_buffer_for_transfer, sizeof(number), sockfd);
 }
 
-uint32_t read_number_from_socket(int sockfd){
+uint32_t read_number_from_socket(int sockfd) {
     uint32_t number_for_transfer;
     char *file_size_buffer_for_transfer = (char *) &number_for_transfer;
     read_chars_from_socket(file_size_buffer_for_transfer, sizeof(uint32_t), sockfd);
@@ -107,10 +108,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     char *file_path = argv[3];
-
-    // Connect to server and get the socket file descriptor
-    int sockfd = connect_to_server(port_number, ip);
-
     file = fopen(file_path, "r");
 
     // check if file exists
@@ -118,6 +115,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error opening file %s\n", file_path);
         exit(1);
     }
+
+    // Connect to server and get the socket file descriptor
+    int sockfd = connect_to_server(port_number, ip);
 
     // get the file size, convert it, and send it
     uint32_t file_size = get_file_size(file_path);
