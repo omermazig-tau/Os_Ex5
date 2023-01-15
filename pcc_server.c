@@ -10,6 +10,7 @@
 const int MB_IN_BYTES = 1048576;
 const int RESERVED_TCP_PORTS = 1024;
 uint32_t pcc_total[126 + 1] = {0};
+bool is_sig_int = false;
 
 bool is_printable_character(char character) {
     return 32 <= character && character <= 126;
@@ -30,7 +31,7 @@ void print_pcc_total() {
 
 void sig_int_handler() {
     //TODO - Add logic here
-    exit(420);
+    is_sig_int = true;
 }
 
 void set_sig_int() {
@@ -162,11 +163,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     int sockfd = connect_server(port_number);
+    //TODO - right place for this?
     set_sig_int();
 
     int batch_size = MB_IN_BYTES; // number of bytes to read per iteration
     char buffer[batch_size];
-    while (1) {
+    while (!is_sig_int) {
         int client_fd = accept_connection(sockfd);
         // Read the file size from the client
         uint32_t file_size = read_number_from_socket(client_fd);
@@ -193,4 +195,5 @@ int main(int argc, char *argv[]) {
         update_pcc_total(temp_pcc_total);
         close(client_fd);
     }
+    print_pcc_total();
 }

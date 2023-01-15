@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     // Connect to server and get the socket file descriptor
     int sockfd = connect_to_server(port_number, ip);
 
-    // get the file size, convert it, and send it
+    // get the file size and send it over the socket
     uint32_t file_size = get_file_size(file_path);
     write_number_to_socket(file_size, sockfd);
 
