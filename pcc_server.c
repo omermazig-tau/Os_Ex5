@@ -73,8 +73,7 @@ struct sockaddr_in build_sockaddr_in(unsigned int port_number) {
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(port_number);
     // Accept connections on all network interface
-    // TODO - htonl necessary?
-    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_address.sin_addr.s_addr = INADDR_ANY;
     return server_address;
 }
 
@@ -118,7 +117,7 @@ size_t write_chars_to_socket(char *characters, size_t chars_to_write, int sockfd
         temp_bytes_written = write(sockfd, characters, left);
         if (temp_bytes_written <= 0) {
             perror("Error writing to socket");
-            return left;
+            break;
         }
         characters += temp_bytes_written;
         left -= temp_bytes_written;
@@ -135,7 +134,7 @@ size_t read_chars_from_socket(char *characters, size_t chars_to_read, int sockfd
         temp_bytes_read = read(sockfd, characters, left);
         if (temp_bytes_read <= 0) {
             perror("Error reading from socket");
-            return left;
+            break;
         }
         characters += temp_bytes_read;
         left -= temp_bytes_read;
@@ -170,7 +169,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     int sockfd = connect_server(port_number);
-    //TODO - right place for this?
     set_sig_int();
 
     int batch_size = MB_IN_BYTES; // number of bytes to read per iteration
@@ -178,11 +176,11 @@ int main(int argc, char *argv[]) {
     while (!is_sig_int) {
         int client_fd = accept_connection(sockfd);
         accepted_connection = true;
-        uint32_t left;
+        uint32_t bytes_left;
         // Read the file size from the client
         uint32_t file_size;
-        left = read_number_from_socket(&file_size, client_fd);
-        if(left != 0){
+        bytes_left = read_number_from_socket(&file_size, client_fd);
+        if(bytes_left != 0){
             continue;
         }
 
@@ -192,8 +190,8 @@ int main(int argc, char *argv[]) {
         // Read data from the client and count printable characters
         do {
             size_t bytes_to_read = batch_size < file_size - bytes_read ? batch_size : file_size - bytes_read;
-            left = read_chars_from_socket(buffer, bytes_to_read, client_fd);
-            if(left != 0){
+            bytes_left = read_chars_from_socket(buffer, bytes_to_read, client_fd);
+            if(bytes_left != 0){
                 break;
             }
             bytes_read += bytes_to_read;
@@ -205,14 +203,14 @@ int main(int argc, char *argv[]) {
                 }
             }
         } while (bytes_read < file_size);
-        if(left != 0){
+        if(bytes_left != 0){
             // This means that we ended the reading from the client on bad terms
             continue;
         }
 
         // Write the result back to the client
-        left = write_number_to_socket(pcc, client_fd);
-        if(left != 0){
+        bytes_left = write_number_to_socket(pcc, client_fd);
+        if(bytes_left != 0){
             continue;
         }
         // Update pcc_total
@@ -221,5 +219,6 @@ int main(int argc, char *argv[]) {
         accepted_connection = false;
     }
     print_pcc_total();
+    close(sockfd);
     exit(0);
 }

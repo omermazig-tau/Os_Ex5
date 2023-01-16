@@ -126,18 +126,25 @@ int main(int argc, char *argv[]) {
     uint32_t file_size = get_file_size(file_path);
     write_number_to_socket(file_size, sockfd);
 
+    int total_bytes_read = 0;
     // iterate over file and send batch_size bytes at a time
     while ((bytes_read = fread(buffer, 1, batch_size, file)) > 0) {
         // write the bytes read into the socket
         write_chars_to_socket(buffer, bytes_read, sockfd);
+        // updates total_bytes_read for later
+        total_bytes_read += bytes_read;
     }
+    if (total_bytes_read != file_size){
+        fprintf(stderr, "Error reading all of file %s\n", file_path);
+        exit(1);
+    }
+    fclose(file);
 
     uint32_t C;
     read_number_from_socket(&C, sockfd);
     // print the number of printable characters
     printf("# of printable characters: %u\n", C);
 
-    fclose(file);
     close(sockfd);
     return 0;
 }
